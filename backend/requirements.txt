@@ -1,0 +1,7 @@
+# ReviewX backend runtime dependencies.
+# Install with:  .\venv\Scripts\pip install -r requirements.txt
+fastapi==0.141.1
+uvicorn==0.52.4
+httpx==0.28.1
+chromadb==1.5.9
+sentence-transformers==6.0.1
