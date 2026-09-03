@@ -1,0 +1,205 @@
+import React, { useState, useEffect } from "react";
+import { DiagnosticCard } from "./components/DiagnosticCard";
+import { VerificationModal } from "./components/VerificationModal";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useWebviewProtocol } from "./hooks/useWebviewProtocol";
+import {
+  ReviewXCommand,
+  type DiagnosticItem,
+  type ScanFileParams,
+  type ApplyCodeFixParams
+} from "../types/protocol";
+
+// ─── SVG Icon Components ─────────────────────────────────────────────────────
+
+const BridgeIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12h4l3-9 6 18 3-9h4" />
+    <circle cx="12" cy="12" r="2" fill="currentColor" />
+  </svg>
+);
+
+const ScanIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+    <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+    <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+    <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+    <rect x="7" y="7" width="10" height="10" rx="1" />
+  </svg>
+);
+
+const EmptyIcon = () => (
+  <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="9" y1="13" x2="15" y2="13" />
+    <line x1="9" y1="17" x2="15" y2="17" />
+  </svg>
+);
+
+function App() {
+  const { sendMessage, lastMessage } = useWebviewProtocol();
+  const [showVerification, setShowVerification] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticItem[]>([]);
+
+  // Handle view resolution and initial state
+  useEffect(() => {
+    // Notify extension host that webview is ready
+    sendMessage({
+      jsonrpc: "2.0",
+      method: "ON_WEBVIEW_READY",
+      params: { timestamp: Date.now() }
+    });
+  }, [sendMessage]);
+
+  // Handle incoming messages from extension host
+  useEffect(() => {
+    if (lastMessage && "method" in lastMessage && lastMessage.method === ReviewXCommand.SCAN_FILE) {
+      const params = (lastMessage as { params: ScanFileParams }).params;
+      console.log("Received scan request:", params);
+      if (params.content) {
+        setIsScanning(true);
+        setTimeout(() => setIsScanning(false), 1000);
+      }
+    }
+  }, [lastMessage]);
+
+  const handleScanFile = async () => {
+    setIsScanning(true);
+    await sendMessage({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: ReviewXCommand.SCAN_FILE,
+      params: {} as ScanFileParams
+    });
+  };
+
+  const handleVerificationComplete = async (verified: boolean) => {
+    if (verified) {
+      await sendMessage({
+        jsonrpc: "2.0",
+        id: Date.now(),
+        method: ReviewXCommand.APPLY_CODE_FIX,
+        params: {} as ApplyCodeFixParams
+      });
+    }
+    setShowVerification(false);
+  };
+
+  const hasCritical = diagnostics.some(d => d.severity === "error");
+  const criticalCount = diagnostics.filter(d => d.severity === "error").length;
+  const warningCount = diagnostics.filter(d => d.severity === "warning").length;
+
+  return (
+    <ErrorBoundary fallback={<div className="p-4 text-vscode-editor-foreground">An error occurred</div>}>
+      <div className="h-full w-full flex flex-col bg-vscode-editor-background text-vscode-editor-foreground">
+
+        {/* ─── Sleek Header ─────────────────────────────────────────────── */}
+        <header className="relative flex items-center justify-between px-5 py-3.5 border-b border-subtle bg-subtle-gradient">
+          {/* Left: Brand + version */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-vscode-activityBar-background/60 border border-vscode-input-border">
+              <BridgeIcon />
+            </div>
+            <div className="flex flex-col">
+              <h1 className="text-base font-semibold leading-tight tracking-tight">
+                ReviewX
+              </h1>
+              <span className="text-[10px] text-vscode-editor-foreground/50 font-medium">
+                v0.1.0
+              </span>
+            </div>
+          </div>
+
+          {/* Right: Stats pill + scan button */}
+          <div className="flex items-center gap-3">
+            {diagnostics.length > 0 && (
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-vscode-input-background/50 border border-vscode-input-border">
+                {hasCritical && (
+                  <span className="flex items-center gap-1 text-[10px] font-medium text-vscode-problemsErrorIcon-foreground">
+                    <span className="w-1.5 h-1.5 rounded-full bg-vscode-problemsErrorIcon-foreground animate-pulse" />
+                    {criticalCount}
+                  </span>
+                )}
+                {warningCount > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] font-medium text-vscode-problemsWarningIcon-foreground">
+                    <span className="w-1.5 h-1.5 rounded-full bg-vscode-problemsWarningIcon-foreground" />
+                    {warningCount}
+                  </span>
+                )}
+              </div>
+            )}
+            <button
+              onClick={handleScanFile}
+              disabled={isScanning}
+              className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-vscode-button-background text-vscode-button-foreground rounded-lg hover:bg-vscode-button-hoverBackground disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:shadow-md hover:shadow-black/20 active:scale-[0.98]"
+            >
+              <ScanIcon />
+              <span>{isScanning ? "Scanning..." : "Scan File"}</span>
+            </button>
+          </div>
+        </header>
+
+        {/* ─── Main Content Area ─────────────────────────────────────────── */}
+        <main className="flex-1 overflow-auto p-5 scrollbar-thin">
+          {diagnostics.length > 0 ? (
+            <div className="space-y-4 max-w-2xl">
+              {/* Section label */}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-vscode-editor-foreground/40">
+                  Findings
+                </span>
+                <div className="flex-1 h-px bg-vscode-input-border/50" />
+                <span className="text-[10px] text-vscode-editor-foreground/40">
+                  {diagnostics.length} issue{diagnostics.length !== 1 ? "s" : ""} detected
+                </span>
+              </div>
+              {diagnostics.map((diagnostic, index) => (
+                <div
+                  key={diagnostic.id}
+                  className="animate-[slide-up-fade_0.3s_ease-out_forwards]"
+                  style={{ animationDelay: `${index * 60}ms`, opacity: 0 }}
+                >
+                  <DiagnosticCard
+                    diagnostic={diagnostic}
+                    onApplyFix={() => setShowVerification(true)}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* ─── Empty State ─────────────────────────────────────────── */
+            <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 bg-vscode-activityBarBadge-background/10 rounded-full blur-xl" />
+                <div className="relative flex items-center justify-center w-20 h-20 rounded-2xl bg-vscode-input-background/40 border border-vscode-input-border">
+                  <EmptyIcon />
+                </div>
+              </div>
+              <p className="text-sm font-medium text-vscode-editor-foreground/70 mb-1.5">
+                No diagnostics found
+              </p>
+              <p className="text-xs text-vscode-editor-foreground/40 max-w-[220px]">
+                Open a file and click{" "}
+                <span className="text-vscode-editor-foreground/60 font-medium">Scan File</span>{" "}
+                to begin analysis
+              </p>
+            </div>
+          )}
+        </main>
+
+        {/* ─── Verification Modal ─────────────────────────────────────────── */}
+        {showVerification && (
+          <VerificationModal
+            onVerified={handleVerificationComplete}
+            onCancel={() => setShowVerification(false)}
+          />
+        )}
+      </div>
+    </ErrorBoundary>
+  );
+}
+
+export default App;

@@ -1,0 +1,100 @@
+{
+  "name": "reviewx",
+  "displayName": "ReviewX",
+  "description": "Scaffolding Module 1: Diagnostic and Knowledge Bridge Extension for VS Code",
+  "version": "0.1.0",
+  "publisher": "reviewx",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages",
+    "Linters"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:reviewX.sidebarView"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "reviewx-explorer",
+          "title": "ReviewX",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "reviewx-explorer": [
+        {
+          "type": "webview",
+          "id": "reviewX.sidebarView",
+          "name": "ReviewX",
+          "icon": "media/icon.svg",
+          "contextualTitle": "ReviewX Assistant"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "reviewX.refreshView",
+        "title": "Refresh ReviewX View",
+        "category": "ReviewX",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "reviewX.scanActiveFile",
+        "title": "Scan Active File",
+        "category": "ReviewX",
+        "icon": "$(search)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "reviewX.refreshView",
+          "when": "view == reviewX.sidebarView",
+          "group": "navigation"
+        },
+        {
+          "command": "reviewX.scanActiveFile",
+          "when": "view == reviewX.sidebarView",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile && npm run build:webview",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "build:webview": "vite build",
+    "dev:webview": "vite --config vite.config.ts",
+    "build:all": "npm run compile && npm run build:webview",
+    "check-types:webview": "tsc -p tsconfig.webview.json"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
+    "@vitejs/plugin-react": "^4.2.0",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.x",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0"
+  }
+}
