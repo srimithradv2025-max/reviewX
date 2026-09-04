@@ -16,6 +16,7 @@
     "forceConsistentCasingInFileNames": true
   },
   "files": [
+    "src/extension.ts",
     "src/providers/ReviewXWebviewProvider.ts",
     "src/types/protocol.ts",
     "src/editor/decorations.ts"

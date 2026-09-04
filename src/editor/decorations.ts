@@ -1,28 +1,32 @@
-import * as vscode from 'vscode';
-import { DiagnosticDefect } from '../types/protocol';
+import * as vscode from "vscode";
+import { DiagnosticItem } from "../types/protocol";
 
 const warningDecoration = vscode.window.createTextEditorDecorationType({
-  underlines: '3px dashed #f59e0b',
-  overviewRulerColor: '#f59e0b',
-  overviewRulerLane: vscode.OverviewRulerLane.Right,
+  textDecoration: "underline 3px dashed #f59e0b",
+  overviewRulerColor: "#f59e0b",
+  overviewRulerLane: vscode.OverviewRulerLane.Right
 });
 
 const errorDecoration = vscode.window.createTextEditorDecorationType({
-  underlines: '3px solid #ef4444',
-  overviewRulerColor: '#ef4444',
-  overviewRulerLane: vscode.OverviewRulerLane.Right,
+  textDecoration: "underline 3px solid #ef4444",
+  overviewRulerColor: "#ef4444",
+  overviewRulerLane: vscode.OverviewRulerLane.Right
 });
 
-export function applyLineDecorations(editor: vscode.TextEditor, defects: DiagnosticDefect[]) {
+export function applyLineDecorations(
+  editor: vscode.TextEditor,
+  diagnostics: DiagnosticItem[]
+): void {
   const warningRanges: vscode.Range[] = [];
   const errorRanges: vscode.Range[] = [];
+  const lastLine = editor.document.lineCount - 1;
 
-  defects.forEach((defect) => {
-    const lineIndex = Math.max(0, defect.line - 1);
+  diagnostics.forEach(diagnostic => {
+    const lineIndex = Math.min(Math.max(0, diagnostic.range.start.line), lastLine);
     const line = editor.document.lineAt(lineIndex);
     const range = new vscode.Range(lineIndex, 0, lineIndex, line.text.length);
 
-    if (defect.severity === 'error') {
+    if (diagnostic.severity === "error") {
       errorRanges.push(range);
     } else {
       warningRanges.push(range);

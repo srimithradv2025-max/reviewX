@@ -4,7 +4,7 @@ import { useWebviewProtocol } from "../hooks/useWebviewProtocol";
 
 export interface DiagnosticCardProps {
   diagnostic: DiagnosticItem;
-  onApplyFix?: (diagnosticId?: string) => void;
+  onApplyFix?: (diagnostic: DiagnosticItem) => void;
 }
 
 const severityLabels: Record<DiagnosticSeverity, string> = {
@@ -93,30 +93,11 @@ export const DiagnosticCard: React.FC<DiagnosticCardProps> = ({
   const sourceLabel = diagnostic.category ?? "Code Quality";
   const recommendation = diagnostic.recommendation ?? "";
 
-  const oldContent = diagnostic.title ?? "Original code";
+  const oldContent = diagnostic.snippet ?? diagnostic.title ?? "Original code";
   const newContent = recommendation ?? "Fixed code";
 
-  const handleApplyFix = async () => {
-    const params = {
-      uri: diagnostic.uri ?? "",
-      fixId: diagnostic.id,
-      title: diagnostic.message,
-      edits: diagnostic.relatedInformation?.map(related => ({
-        range: related.range,
-        newText: recommendation ?? ""
-      })) ?? [],
-      preserveCursor: true
-    };
-
-    await sendMessage({
-      jsonrpc: "2.0",
-      id: Date.now(),
-      method: "APPLY_CODE_FIX",
-      params
-    });
-
-    onApplyFix?.(diagnostic.id);
-  };
+  // Fixes are gated behind the verification modal owned by the parent view.
+  const handleApplyFix = () => onApplyFix?.(diagnostic);
 
   const handleCopy = useCallback(async () => {
     const text = `- ${oldContent}\n+ ${newContent}`;

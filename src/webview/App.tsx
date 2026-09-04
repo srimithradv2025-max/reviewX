@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { DiagnosticCard } from "./components/DiagnosticCard";
 import { VerificationModal } from "./components/VerificationModal";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useWebviewProtocol } from "./hooks/useWebviewProtocol";
+import { scanCode, type ScanRequestPayload } from "./services/apiService";
+import { buildVerificationQuiz, type VerificationQuiz } from "./utils/verificationQuiz";
 import {
   ReviewXCommand,
+  isJsonRpcResponse,
+  isJsonRpcErrorResponse,
   type DiagnosticItem,
+  type JsonRpcId,
+  type JsonRpcSuccessResponse,
   type ScanFileParams,
+  type ScanFileResult,
   type ApplyCodeFixParams
 } from "../types/protocol";
 
@@ -40,9 +47,12 @@ const EmptyIcon = () => (
 
 function App() {
   const { sendMessage, lastMessage } = useWebviewProtocol();
-  const [showVerification, setShowVerification] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [activeQuiz, setActiveQuiz] = useState<VerificationQuiz | null>(null);
+  const [pendingFix, setPendingFix] = useState<DiagnosticItem | null>(null);
+  const pendingScanId = useRef<JsonRpcId | null>(null);
 
   // Handle view resolution and initial state
   useEffect(() => {
@@ -54,38 +64,109 @@ function App() {
     });
   }, [sendMessage]);
 
+  const runBackendScan = useCallback(
+    async (payload: ScanRequestPayload) => {
+      setIsScanning(true);
+      setError(null);
+      try {
+        const result = await scanCode(payload);
+        setDiagnostics(result.diagnostics ?? []);
+        await sendMessage({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: ReviewXCommand.RENDER_DIAGNOSTIC,
+          params: {
+            uri: result.uri,
+            diagnostics: result.diagnostics ?? [],
+            clearPrevious: true
+          }
+        });
+      } catch (err) {
+        setDiagnostics([]);
+        setError(err instanceof Error ? err.message : "Scan failed.");
+      } finally {
+        setIsScanning(false);
+      }
+    },
+    [sendMessage]
+  );
+
   // Handle incoming messages from extension host
   useEffect(() => {
-    if (lastMessage && "method" in lastMessage && lastMessage.method === ReviewXCommand.SCAN_FILE) {
-      const params = (lastMessage as { params: ScanFileParams }).params;
-      console.log("Received scan request:", params);
-      if (params.content) {
-        setIsScanning(true);
-        setTimeout(() => setIsScanning(false), 1000);
+    if (!lastMessage) return;
+
+    // Host-initiated scan (e.g. the "Scan Active File" command).
+    if ("method" in lastMessage && lastMessage.method === ReviewXCommand.SCAN_FILE) {
+      const params = (lastMessage as { params?: ScanFileParams }).params;
+      if (params?.content !== undefined) {
+        void runBackendScan({
+          uri: params.uri,
+          content: params.content,
+          languageId: params.languageId
+        });
       }
+      return;
     }
-  }, [lastMessage]);
+
+    if (!isJsonRpcResponse(lastMessage) || lastMessage.id !== pendingScanId.current) return;
+    pendingScanId.current = null;
+
+    if (isJsonRpcErrorResponse(lastMessage)) {
+      setIsScanning(false);
+      setError(lastMessage.error.message);
+      return;
+    }
+
+    const result = (lastMessage as JsonRpcSuccessResponse<ScanFileResult>).result;
+    void runBackendScan({
+      uri: result.uri,
+      content: result.content,
+      languageId: result.languageId
+    });
+  }, [lastMessage, runBackendScan]);
 
   const handleScanFile = async () => {
     setIsScanning(true);
+    setError(null);
+    const id = Date.now();
+    pendingScanId.current = id;
     await sendMessage({
       jsonrpc: "2.0",
-      id: Date.now(),
+      id,
       method: ReviewXCommand.SCAN_FILE,
       params: {} as ScanFileParams
     });
   };
 
+  const handleRequestFix = (diagnostic: DiagnosticItem) => {
+    setPendingFix(diagnostic);
+    setActiveQuiz(buildVerificationQuiz(diagnostic));
+  };
+
+  const closeVerification = useCallback(() => {
+    setPendingFix(null);
+    setActiveQuiz(null);
+  }, []);
+
   const handleVerificationComplete = async (verified: boolean) => {
-    if (verified) {
+    const diagnostic = pendingFix;
+    if (verified && diagnostic) {
+      const params: ApplyCodeFixParams = {
+        uri: diagnostic.uri ?? "",
+        fixId: diagnostic.id,
+        title: diagnostic.message,
+        diagnosticId: diagnostic.id,
+        edits: [{ range: diagnostic.range, newText: diagnostic.recommendation ?? "" }],
+        preserveCursor: true
+      };
       await sendMessage({
         jsonrpc: "2.0",
         id: Date.now(),
         method: ReviewXCommand.APPLY_CODE_FIX,
-        params: {} as ApplyCodeFixParams
+        params
       });
     }
-    setShowVerification(false);
+    closeVerification();
   };
 
   const hasCritical = diagnostics.some(d => d.severity === "error");
@@ -144,6 +225,11 @@ function App() {
 
         {/* ─── Main Content Area ─────────────────────────────────────────── */}
         <main className="flex-1 overflow-auto p-5 scrollbar-thin">
+          {error && (
+            <div className="mb-4 rounded-lg border border-vscode-input-border bg-vscode-input-background/40 px-3 py-2 text-xs text-vscode-problemsErrorIcon-foreground">
+              {error}
+            </div>
+          )}
           {diagnostics.length > 0 ? (
             <div className="space-y-4 max-w-2xl">
               {/* Section label */}
@@ -164,7 +250,7 @@ function App() {
                 >
                   <DiagnosticCard
                     diagnostic={diagnostic}
-                    onApplyFix={() => setShowVerification(true)}
+                    onApplyFix={handleRequestFix}
                   />
                 </div>
               ))}
@@ -191,10 +277,11 @@ function App() {
         </main>
 
         {/* ─── Verification Modal ─────────────────────────────────────────── */}
-        {showVerification && (
+        {pendingFix && (
           <VerificationModal
+            quiz={activeQuiz}
             onVerified={handleVerificationComplete}
-            onCancel={() => setShowVerification(false)}
+            onCancel={closeVerification}
           />
         )}
       </div>

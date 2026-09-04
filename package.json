@@ -75,8 +75,8 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "build:webview": "vite build",
     "dev:webview": "vite --config vite.config.ts",
-    "build:all": "npm run compile && npm run build:webview",
-    "check-types:webview": "tsc -p tsconfig.webview.json"
+    "build:all": "npm run compile && npm run check-types:webview && npm run build:webview",
+    "check-types:webview": "tsc -p src/webview/tsconfig.json --noEmit"
   },
   "dependencies": {
     "react": "^18.2.0",

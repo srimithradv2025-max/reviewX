@@ -19,6 +19,7 @@ import {
   createJsonRpcErrorResponse,
   isJsonRpcRequest
 } from "../types/protocol";
+import { applyLineDecorations } from "../editor/decorations";
 
 /**
  * WebviewViewProvider for the ReviewX extension.
@@ -145,7 +146,7 @@ export class ReviewXWebviewProvider implements vscode.WebviewViewProvider {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src http://127.0.0.1:8000 http://localhost:8000;" />
   <link rel="stylesheet" href="${styleUri}" />
   <title>ReviewX</title>
 </head>
@@ -189,6 +190,7 @@ export class ReviewXWebviewProvider implements vscode.WebviewViewProvider {
     return {
       uri: document.uri.toString(),
       languageId: document.languageId,
+      content: text,
       lineCount: document.lineCount,
       diagnostics,
       symbolsScanned: lines.length,
@@ -220,6 +222,12 @@ export class ReviewXWebviewProvider implements vscode.WebviewViewProvider {
       return diagnostic;
     });
     this._diagnosticCollection.set(targetUri, vscodeDiagnostics);
+
+    const editor = vscode.window.visibleTextEditors.find(
+      candidate => candidate.document.uri.toString() === targetUri.toString()
+    );
+    if (editor) applyLineDecorations(editor, params.diagnostics || []);
+
     return { uri: targetUri.toString(), renderedCount: vscodeDiagnostics.length, success: true, timestamp: Date.now() };
   }
 

@@ -97,6 +97,7 @@ export interface DiagnosticItem {
   code?: string | number;
   relatedInformation?: DiagnosticRelatedInformation[];
   category?: string;
+  snippet?: string;
   recommendation?: string;
   title?: string;
   uri?: string;
@@ -137,6 +138,7 @@ export interface ScanFileParams {
 export interface ScanFileResult {
   uri: string;
   languageId: string;
+  content: string;
   lineCount: number;
   symbolsScanned: number;
   findingsCount: number;
