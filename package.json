@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "publisher": "reviewx",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.136.0"
   },
   "categories": [
     "Other",
