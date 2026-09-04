@@ -1,36 +1,19 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { resolve } from "path";
-
-// Vite configuration for the VS Code Webview.
-// The webview source is in src/webview/ and the build outputs to dist/webview/
-const webviewRoot = resolve(__dirname, "src", "webview");
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
-  root: webviewRoot,
-  base: "./",
   plugins: [react()],
-  resolve: {
-    alias: {
-      "@": webviewRoot
-    }
-  },
   build: {
-    outDir: resolve(__dirname, "dist", "webview"),
+    outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: resolve(webviewRoot, "index.html"),
+      input: path.resolve(__dirname, 'src/webview/main.tsx'),
       output: {
-        // Single bundle, no code splitting (CSP-friendly for VS Code webviews)
-        manualChunks: undefined
-      }
+        entryFileNames: 'webview.js',
+        assetFileNames: 'style.css',
+        format: 'iife',
+      },
     },
-    target: "es2020",
-    sourcemap: true,
-    minify: "esbuild"
   },
-  server: {
-    port: 3000,
-    strictPort: true
-  }
 });
