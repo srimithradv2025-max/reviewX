@@ -18,11 +18,23 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.window.showWarningMessage("ReviewX: open a file to scan.");
         return;
       }
-      await provider.sendNotification(ReviewXCommand.SCAN_FILE, {
+      await vscode.commands.executeCommand(`${ReviewXWebviewProvider.viewType}.focus`);
+      try {
+        await provider.whenReady();
+      } catch (err) {
+        vscode.window.showErrorMessage(
+          `ReviewX: ${err instanceof Error ? err.message : "the view could not be opened."}`
+        );
+        return;
+      }
+      const delivered = await provider.sendNotification(ReviewXCommand.SCAN_FILE, {
         uri: editor.document.uri.toString(),
         content: editor.document.getText(),
         languageId: editor.document.languageId
       });
+      if (!delivered) {
+        vscode.window.showErrorMessage("ReviewX: could not deliver the scan request to the view.");
+      }
     })
   );
 }

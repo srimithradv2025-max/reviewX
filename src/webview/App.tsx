@@ -5,6 +5,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useWebviewProtocol } from "./hooks/useWebviewProtocol";
 import { scanCode, type ScanRequestPayload } from "./services/apiService";
 import { buildVerificationQuiz, type VerificationQuiz } from "./utils/verificationQuiz";
+import { buildFixEdits } from "./utils/fixEdits";
 import {
   ReviewXCommand,
   isJsonRpcResponse,
@@ -53,6 +54,9 @@ function App() {
   const [activeQuiz, setActiveQuiz] = useState<VerificationQuiz | null>(null);
   const [pendingFix, setPendingFix] = useState<DiagnosticItem | null>(null);
   const pendingScanId = useRef<JsonRpcId | null>(null);
+  const scanGeneration = useRef(0);
+  const renderedUri = useRef<string | null>(null);
+  const scanLanguageId = useRef<string | undefined>(undefined);
 
   // Handle view resolution and initial state
   useEffect(() => {
@@ -66,11 +70,16 @@ function App() {
 
   const runBackendScan = useCallback(
     async (payload: ScanRequestPayload) => {
+      const generation = ++scanGeneration.current;
+      const isCurrent = () => generation === scanGeneration.current;
       setIsScanning(true);
       setError(null);
       try {
         const result = await scanCode(payload);
+        if (!isCurrent()) return;
         setDiagnostics(result.diagnostics ?? []);
+        scanLanguageId.current = result.languageId ?? payload.languageId;
+        renderedUri.current = result.uri;
         await sendMessage({
           jsonrpc: "2.0",
           id: Date.now(),
@@ -82,10 +91,27 @@ function App() {
           }
         });
       } catch (err) {
+        if (!isCurrent()) return;
         setDiagnostics([]);
-        setError(err instanceof Error ? err.message : "Scan failed.");
+        const message = err instanceof Error ? err.message : "Scan failed.";
+        const staleUri = renderedUri.current ?? payload.uri;
+        let clearFailure = "";
+        if (staleUri) {
+          try {
+            await sendMessage({
+              jsonrpc: "2.0",
+              id: Date.now(),
+              method: ReviewXCommand.RENDER_DIAGNOSTIC,
+              params: { uri: staleUri, diagnostics: [], clearPrevious: true }
+            });
+            renderedUri.current = null;
+          } catch {
+            clearFailure = " Previous editor findings could not be cleared.";
+          }
+        }
+        if (isCurrent()) setError(`${message}${clearFailure}`);
       } finally {
-        setIsScanning(false);
+        if (isCurrent()) setIsScanning(false);
       }
     },
     [sendMessage]
@@ -151,12 +177,18 @@ function App() {
   const handleVerificationComplete = async (verified: boolean) => {
     const diagnostic = pendingFix;
     if (verified && diagnostic) {
+      const edits = buildFixEdits(diagnostic, scanLanguageId.current);
+      if (!edits) {
+        setError(`No applicable fix is available for '${diagnostic.id}'.`);
+        closeVerification();
+        return;
+      }
       const params: ApplyCodeFixParams = {
-        uri: diagnostic.uri ?? "",
+        uri: diagnostic.uri ?? renderedUri.current ?? "",
         fixId: diagnostic.id,
-        title: diagnostic.message,
+        title: diagnostic.fix?.title ?? diagnostic.message,
         diagnosticId: diagnostic.id,
-        edits: [{ range: diagnostic.range, newText: diagnostic.recommendation ?? "" }],
+        edits,
         preserveCursor: true
       };
       await sendMessage({

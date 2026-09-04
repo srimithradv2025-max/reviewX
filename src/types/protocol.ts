@@ -88,6 +88,16 @@ export interface DiagnosticRelatedInformation {
   uri: string;
 }
 
+/**
+ * A concrete, machine-applicable fix: `newText` is valid source code that
+ * replaces exactly `range`. Prose guidance belongs in `recommendation`.
+ */
+export interface CodeFix {
+  range: Range;
+  newText: string;
+  title?: string;
+}
+
 export interface DiagnosticItem {
   id: string;
   message: string;
@@ -99,6 +109,7 @@ export interface DiagnosticItem {
   category?: string;
   snippet?: string;
   recommendation?: string;
+  fix?: CodeFix;
   title?: string;
   uri?: string;
 }

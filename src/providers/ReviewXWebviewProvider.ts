@@ -17,7 +17,8 @@ import {
   DiagnosticItem,
   createJsonRpcSuccessResponse,
   createJsonRpcErrorResponse,
-  isJsonRpcRequest
+  isJsonRpcRequest,
+  isJsonRpcNotification
 } from "../types/protocol";
 import { applyLineDecorations } from "../editor/decorations";
 
@@ -30,6 +31,8 @@ export class ReviewXWebviewProvider implements vscode.WebviewViewProvider {
   private readonly _diagnosticCollection: vscode.DiagnosticCollection;
   private _pendingRequests = new Map<string | number, { resolve: (v: unknown) => void; reject: (r?: unknown) => void; timeout: NodeJS.Timeout; }>();
   private _requestIdCounter = 1;
+  private _isReady = false;
+  private _readyWaiters: Array<() => void> = [];
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -44,6 +47,7 @@ export class ReviewXWebviewProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ): void {
     this._view = webviewView;
+    this._isReady = false;
     webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
@@ -64,6 +68,7 @@ export class ReviewXWebviewProvider implements vscode.WebviewViewProvider {
 
     webviewView.onDidDispose(() => {
       this._view = undefined;
+      this._isReady = false;
       this._diagnosticCollection.clear();
       for (const [, pending] of this._pendingRequests) {
         clearTimeout(pending.timeout);
@@ -73,7 +78,36 @@ export class ReviewXWebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  /** Resolves once the webview has announced ON_WEBVIEW_READY. */
+  public whenReady(timeoutMs = 10000): Promise<void> {
+    if (this._isReady) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      let onReady: () => void;
+      const timeout = setTimeout(() => {
+        this._readyWaiters = this._readyWaiters.filter(waiter => waiter !== onReady);
+        reject(new Error(`ReviewX view was not ready after ${timeoutMs}ms`));
+      }, timeoutMs);
+      onReady = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+      this._readyWaiters.push(onReady);
+    });
+  }
+
+  private _markReady(): void {
+    this._isReady = true;
+    const waiters = this._readyWaiters;
+    this._readyWaiters = [];
+    for (const waiter of waiters) waiter();
+  }
+
   public async handleWebviewMessage(rawMessage: unknown): Promise<void> {
+    if (isJsonRpcNotification(rawMessage) && rawMessage.method === "ON_WEBVIEW_READY") {
+      this._markReady();
+      return;
+    }
+
     if (!isJsonRpcRequest(rawMessage)) {
       if (typeof rawMessage === "object" && rawMessage !== null && "id" in rawMessage && ("result" in rawMessage || "error" in rawMessage)) {
         const res = rawMessage as JsonRpcResponse;
