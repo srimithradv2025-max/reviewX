@@ -21,8 +21,13 @@ export default defineConfig({
     rollupOptions: {
       input: resolve(webviewRoot, "index.html"),
       output: {
-        // Single bundle, no code splitting (CSP-friendly for VS Code webviews)
-        manualChunks: undefined
+        // Single bundle with stable names, no code splitting
+        // (CSP-friendly and resolvable from the webview provider).
+        manualChunks: undefined,
+        entryFileNames: "main.js",
+        chunkFileNames: "main.js",
+        assetFileNames: assetInfo =>
+          assetInfo.name && assetInfo.name.endsWith(".css") ? "main.css" : "[name][extname]"
       }
     },
     target: "es2020",

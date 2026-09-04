@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from "react";
 import type { DiagnosticItem, DiagnosticSeverity } from "../../types/protocol";
 import { useWebviewProtocol } from "../hooks/useWebviewProtocol";
+import { hasConcreteFix } from "../utils/fixEdits";
 
 export interface DiagnosticCardProps {
   diagnostic: DiagnosticItem;
-  onApplyFix?: (diagnosticId?: string) => void;
+  onApplyFix?: (diagnostic: DiagnosticItem) => void;
 }
 
 const severityLabels: Record<DiagnosticSeverity, string> = {
@@ -93,30 +94,15 @@ export const DiagnosticCard: React.FC<DiagnosticCardProps> = ({
   const sourceLabel = diagnostic.category ?? "Code Quality";
   const recommendation = diagnostic.recommendation ?? "";
 
-  const oldContent = diagnostic.title ?? "Original code";
-  const newContent = recommendation ?? "Fixed code";
+  const concreteFix = hasConcreteFix(diagnostic);
+  const fixLabel = concreteFix ? "Apply Fix to Editor" : "Insert Guidance Comment";
+  const canFix = concreteFix || recommendation.length > 0;
 
-  const handleApplyFix = async () => {
-    const params = {
-      uri: diagnostic.uri ?? "",
-      fixId: diagnostic.id,
-      title: diagnostic.message,
-      edits: diagnostic.relatedInformation?.map(related => ({
-        range: related.range,
-        newText: recommendation ?? ""
-      })) ?? [],
-      preserveCursor: true
-    };
+  const oldContent = diagnostic.snippet ?? diagnostic.title ?? "Original code";
+  const newContent = diagnostic.fix?.newText ?? recommendation ?? "Fixed code";
 
-    await sendMessage({
-      jsonrpc: "2.0",
-      id: Date.now(),
-      method: "APPLY_CODE_FIX",
-      params
-    });
-
-    onApplyFix?.(diagnostic.id);
-  };
+  // Fixes are gated behind the verification modal owned by the parent view.
+  const handleApplyFix = () => onApplyFix?.(diagnostic);
 
   const handleCopy = useCallback(async () => {
     const text = `- ${oldContent}\n+ ${newContent}`;
@@ -193,10 +179,16 @@ export const DiagnosticCard: React.FC<DiagnosticCardProps> = ({
         <div className="flex gap-2 pt-4 mt-1">
           <button
             onClick={handleApplyFix}
-            className="group/btn flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium bg-vscode-button-background text-vscode-button-foreground rounded-lg hover:bg-vscode-button-hoverBackground transition-all duration-150 active:scale-[0.98] hover:shadow-md hover:shadow-black/20"
+            disabled={!canFix}
+            title={
+              concreteFix
+                ? "Replace the flagged code with the suggested fix"
+                : "Insert the remediation guidance as a comment above the flagged line"
+            }
+            className="group/btn flex-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium bg-vscode-button-background text-vscode-button-foreground rounded-lg hover:bg-vscode-button-hoverBackground transition-all duration-150 active:scale-[0.98] hover:shadow-md hover:shadow-black/20"
           >
             <WandIcon />
-            <span>Apply Fix to Editor</span>
+            <span>{fixLabel}</span>
           </button>
           <button
             onClick={() => sendMessage({

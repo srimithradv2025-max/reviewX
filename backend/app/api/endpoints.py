@@ -10,9 +10,7 @@ import json
 import logging
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Optional
-from urllib.parse import unquote, urlparse
 
 from fastapi import APIRouter, HTTPException
 
@@ -89,25 +87,6 @@ def _to_diagnostic(finding: ast_parser.Finding, uri: str) -> DiagnosticItem:
         snippet=finding.snippet,
         uri=uri,
     )
-
-
-def _read_file(uri: str) -> str:
-    """Read UTF-8 file content from a plain path or a ``file://`` URI."""
-    if uri.startswith("file://"):
-        parsed = urlparse(uri)
-        raw_path = unquote(parsed.path)
-        if re.match(r"^/[A-Za-z]:", raw_path):  # file:///C:/... on Windows
-            raw_path = raw_path[1:]
-        path = Path(raw_path)
-    else:
-        path = Path(uri)
-    try:
-        return path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        raise HTTPException(
-            status_code=404 if isinstance(exc, FileNotFoundError) else 422,
-            detail=f"Could not read '{uri}': {exc.__class__.__name__}.",
-        ) from exc
 
 
 def _next_challenge_id(challenge_id: Optional[str]) -> Optional[str]:
@@ -196,20 +175,20 @@ def _build_verdict_response(
 
 @router.post("/scan", response_model=ScanResponse)
 async def scan(request: ScanRequest) -> ScanResponse:
-    """Scan Python source delivered as raw ``content`` or a file ``uri``."""
-    if request.content is None and request.uri is None:
+    """Scan Python source delivered as raw ``content``.
+
+    ``uri`` is only echoed back as a label; the server never reads local
+    files on a caller's behalf, so an untrusted origin cannot use this
+    endpoint to exfiltrate file contents from the developer's machine.
+    """
+    if request.content is None:
         raise HTTPException(
             status_code=422,
-            detail="Provide either 'content' or 'uri' to scan.",
+            detail="Provide 'content' to scan; the server does not read local files.",
         )
 
     content = request.content
-    line_count = 0
-    if content is not None:
-        line_count = content.count("\n") + 1
-    elif request.uri is not None:
-        content = _read_file(request.uri)
-        line_count = content.count("\n") + 1
+    line_count = content.count("\n") + 1
 
     options = request.options or ScanOptions()
     uri = request.uri or _URI_UNKNOWN
