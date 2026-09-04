@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
 
-interface QuizProps {
-  quiz: {
-    question: string;
-    options: string[];
-    correct_index: number;
-    explanation: string;
-  };
+export interface QuizData {
+  question: string;
+  options: string[];
+  correct_index: number;
+  explanation: string;
+}
+
+export interface VerificationModalProps {
+  quiz: QuizData;
   suggestedFix: string;
   onApplyFix: (fixCode: string) => void;
 }
 
-export const VerificationModal: React.FC<QuizProps> = ({ quiz, suggestedFix, onApplyFix }) => {
+export const VerificationModal: React.FC<VerificationModalProps> = ({
+  quiz,
+  suggestedFix,
+  onApplyFix,
+}) => {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const isCorrect = selectedIdx === quiz.correct_index;
 
@@ -20,7 +26,7 @@ export const VerificationModal: React.FC<QuizProps> = ({ quiz, suggestedFix, onA
       <h4 style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '8px' }}>Comprehension Verification Check</h4>
       <p style={{ fontSize: '11px', color: '#cbd5e1', marginBottom: '8px' }}>{quiz.question}</p>
 
-      {quiz.options.map((opt, idx) => (
+      {quiz.options.map((opt: string, idx: number) => (
         <button
           key={idx}
           onClick={() => setSelectedIdx(idx)}
@@ -35,7 +41,7 @@ export const VerificationModal: React.FC<QuizProps> = ({ quiz, suggestedFix, onA
             border: '1px solid #334155',
             background: selectedIdx === idx ? (idx === quiz.correct_index ? '#16a34a' : '#dc2626') : '#0f172a',
             color: '#ffffff',
-            cursor: 'pointer'
+            cursor: 'pointer',
           }}
         >
           {opt}
@@ -55,7 +61,7 @@ export const VerificationModal: React.FC<QuizProps> = ({ quiz, suggestedFix, onA
           background: isCorrect ? '#4f46e5' : '#334155',
           color: '#ffffff',
           cursor: isCorrect ? 'pointer' : 'not-allowed',
-          opacity: isCorrect ? 1 : 0.5
+          opacity: isCorrect ? 1 : 0.5,
         }}
       >
         {isCorrect ? 'Apply Verified Fix to Editor' : 'Pass Verification Quiz to Unlock Fix'}

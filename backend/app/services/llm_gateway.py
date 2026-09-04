@@ -6,9 +6,10 @@ load_dotenv()
 
 CEREBRAS_KEY = os.getenv("CEREBRAS_API_KEY")
 OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 
-async def generate_llm_explanation(prompt: str) -> str:
-    # Tier 1: Cerebras Cloud (Llama 3.3 70B - Ultra High Speed)
+async def generate_llm_response(prompt: str) -> str:
+    # Tier 1: Cerebras Cloud (Ultra High-Speed Llama 3.3 70B)
     if CEREBRAS_KEY:
         try:
             async with httpx.AsyncClient(timeout=8.0) as client:
@@ -23,7 +24,7 @@ async def generate_llm_explanation(prompt: str) -> str:
                 if res.status_code == 200:
                     return res.json()["choices"][0]["message"]["content"]
         except Exception:
-            pass # Failover to Tier 2
+            pass
 
     # Tier 2: OpenRouter DeepSeek V4 Flash
     if OPENROUTER_KEY:
@@ -42,4 +43,4 @@ async def generate_llm_explanation(prompt: str) -> str:
         except Exception:
             pass
 
-    return "Summary: API key exposed in source code. Move secret to an environment variable."
+    return "Summary: Sensitive credential exposed. Move active secrets to an environment variable."

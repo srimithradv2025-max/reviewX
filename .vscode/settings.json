@@ -1,4 +1,8 @@
 {
   "js/ts.tsdk.path": "node_modules/typescript/lib",
-  "js/ts.tsdk.promptToUseWorkspaceVersion": true
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python.analysis.extraPaths": [
+    "./backend"
+  ]
 }

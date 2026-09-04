@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-09-04T09:54:52.298542",
+  "total_cases_evaluated": 3,
+  "mean_grounding_fidelity": 0.88,
+  "quiz_validation_pass_rate": 0.95,
+  "interlock_detection_rate": 1.0
+}

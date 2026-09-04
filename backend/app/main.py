@@ -1,10 +1,16 @@
+import sys
+import os
+
+# Ensure root workspace directory is in Python path for Pylance / runtime imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from backend.app.services.ast_parser import parse_code_ast
 from ai.guardrails.domain_interlocks import verify_domain_interlocks
 
-app = FastAPI(title="ReviewX / ExpertiseBridge Core API")
+app = FastAPI(title="ReviewX Core API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,7 +26,6 @@ class ScanRequest(BaseModel):
 
 @app.post("/api/v1/scan")
 async def scan_code(payload: ScanRequest):
-    # 1. Run Physical & System Domain Interlocks
     interlock = verify_domain_interlocks(payload.code_snippet, payload.language)
     if interlock["safety_breach"]:
         return {
@@ -37,6 +42,5 @@ async def scan_code(payload: ScanRequest):
             }]
         }
 
-    # 2. Run AST Static Analyzer
     defects = parse_code_ast(payload.code_snippet, payload.language)
     return {"status": "COMPLETED", "defects": defects}

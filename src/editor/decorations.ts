@@ -1,21 +1,20 @@
 import * as vscode from 'vscode';
-import { DiagnosticDefect } from '../types/protocol';
-
-const warningDecoration = vscode.window.createTextEditorDecorationType({
-  underlines: '3px dashed #f59e0b',
-  overviewRulerColor: '#f59e0b',
-  overviewRulerLane: vscode.OverviewRulerLane.Right,
-});
 
 const errorDecoration = vscode.window.createTextEditorDecorationType({
-  underlines: '3px solid #ef4444',
+  textDecoration: '3px solid #ef4444',
   overviewRulerColor: '#ef4444',
   overviewRulerLane: vscode.OverviewRulerLane.Right,
 });
 
-export function applyLineDecorations(editor: vscode.TextEditor, defects: DiagnosticDefect[]) {
-  const warningRanges: vscode.Range[] = [];
+const warningDecoration = vscode.window.createTextEditorDecorationType({
+  textDecoration: '3px dashed #f59e0b',
+  overviewRulerColor: '#f59e0b',
+  overviewRulerLane: vscode.OverviewRulerLane.Right,
+});
+
+export function applyLineDecorations(editor: vscode.TextEditor, defects: any[]) {
   const errorRanges: vscode.Range[] = [];
+  const warningRanges: vscode.Range[] = [];
 
   defects.forEach((defect) => {
     const lineIndex = Math.max(0, defect.line - 1);
@@ -29,6 +28,6 @@ export function applyLineDecorations(editor: vscode.TextEditor, defects: Diagnos
     }
   });
 
-  editor.setDecorations(warningDecoration, warningRanges);
   editor.setDecorations(errorDecoration, errorRanges);
+  editor.setDecorations(warningDecoration, warningRanges);
 }
