@@ -1,17 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!--<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />-->
-  <meta 
-  http-equiv="Content-Security-Policy" 
-  content="default-src 'self'; connect-src 'self' ws://localhost:5173 http://localhost:5173; script-src 'self' 'unsafe-inline';" 
-/>
-  <title>ReviewX</title>
-</head>
-<body>
-  <div id="webview-container"></div>
-  <script type="module" src="/src/webview/main.tsx"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Webview Test</title>
+    <style>
+      body {
+        background-color: #1e1e1e;
+        color: #ffffff;
+        font-family: sans-serif;
+        margin: 0;
+        padding: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <h1 style="color: yellow;">If you see this, HTML works, but React hasn't mounted yet.</h1>
+    </div>
+    <script type="module" src="/src/webview/main.tsx"></script>
+  </body>
 </html>
